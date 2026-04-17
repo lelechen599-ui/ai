@@ -9,20 +9,23 @@ class AIEngine:
         self.draw_node = "dall-e-3"
 
     def run(self, prompt, history):
-        # 自动判定是否为生图需求
-        vision_keys = ["画", "生图", "图", "视觉", "视觉", "创作", "image", "draw"]
-        is_vision = any(k in prompt.lower() for k in vision_keys)
+        # 增加语义预处理，防止空请求
+        if not prompt.strip(): return None, None
         
-        if is_vision:
-            return self._draw(prompt)
-        return self._chat(prompt, history)
+        is_vision = any(k in prompt.lower() for k in ["画", "生图", "视觉", "image", "draw"])
+        
+        try:
+            if is_vision:
+                return self._draw(prompt)
+            return self._chat(prompt, history)
+        except Exception as e:
+            return "ERROR", str(e)
 
     def _draw(self, p):
-        # 复杂的 500 行生图后处理逻辑
         res = self.client.images.generate(model=self.draw_node, prompt=p, quality="hd")
         return "IMAGE", res.data[0].url
 
     def _chat(self, p, h):
-        # 500 行级的流式容错与 Token 优化算法
-        clean_history = [{"role": m["role"], "content": m["content"]} for m in h if m.get("type") != "image"]
+        # 逻辑优化：只传输必要的上下文，减少服务器负担
+        clean_history = [{"role": m["role"], "content": m["content"]} for m in h[-10:] if m.get("type") != "IMAGE"]
         return "TEXT", self.client.chat.completions.create(model=self.chat_node, messages=clean_history, stream=True)
