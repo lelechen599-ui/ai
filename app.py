@@ -1,5 +1,4 @@
 import streamlit as st
-import time
 from styles import inject_ios_engine
 from engine import AIEngine
 
@@ -7,42 +6,54 @@ from engine import AIEngine
 API_KEY = "sk-zYqnIwoG9pI58Mbe7cMNIK9KyNPtnx7u5PcrtLbj0SBZ2VtG"
 BASE_URL = "https://us.novaiapi.com/v1"
 
-# 2. 系统初始化
+# 2. 状态机初始化（保持主题持久化）
 if "messages" not in st.session_state:
     st.session_state.messages = []
+if "theme" not in st.session_state:
     st.session_state.theme = "Light"
 
-# 3. 注入 3000 行级视觉引擎
+# 3. 动态样式注入
 inject_ios_engine(st.session_state.theme)
 
-# 4. 侧边栏：OS 控制台
+# 4. 侧边栏：极简模式切换
 with st.sidebar:
-    st.markdown("<h1 style='color:#007AFF;'>Genesis OS</h1>", unsafe_allow_html=True)
-    st.session_state.theme = st.radio("系统外观", ["Light", "Dark"])
-    if st.button("清空系统内存"):
+    st.markdown("### 💠 Genesis Control")
+    # 使用 selectbox 替换 radio 减少点击时的动画冲突
+    new_theme = st.selectbox("显示模式", ["Light", "Dark"], index=0 if st.session_state.theme=="Light" else 1)
+    if new_theme != st.session_state.theme:
+        st.session_state.theme = new_theme
+        st.rerun()
+    
+    if st.button("清空系统时空"):
         st.session_state.messages = []
         st.rerun()
 
-# 5. 主界面
-st.markdown("<h1 style='text-align:center;'>AIGC 旗舰工作站</h1>", unsafe_allow_html=True)
+# 5. 主内容区（去除多余图标后的高级对话流）
+st.markdown("<h1 style='text-align:center; font-weight:200; letter-spacing:-1px;'>Genesis <span style='color:#007AFF; font-weight:800;'>Vision</span></h1>", unsafe_allow_html=True)
 
-# 6. 对话引擎驱动
 engine = AIEngine(API_KEY, BASE_URL)
 
 for i, msg in enumerate(st.session_state.messages):
     with st.chat_message(msg["role"]):
-        if msg.get("type") == "IMAGE": st.image(msg["content"], use_container_width=True)
-        else: st.markdown(msg["content"])
+        if msg.get("type") == "IMAGE":
+            st.image(msg["content"], use_container_width=True)
+        else:
+            st.markdown(msg["content"])
 
+# 6. 请求逻辑
 if prompt := st.chat_input("在 Genesis OS 中检索或创作..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
+    st.rerun()
+
+# 自动处理逻辑（解决回复完不停止的问题）
+if st.session_state.messages and st.session_state.messages[-1]["role"] == "user":
     with st.chat_message("assistant"):
-        resp_type, result = engine.run(prompt, st.session_state.messages)
+        resp_type, result = engine.run(st.session_state.messages[-1]["content"], st.session_state.messages)
         
         if resp_type == "IMAGE":
             st.image(result, use_container_width=True)
             st.session_state.messages.append({"role": "assistant", "content": result, "type": "IMAGE"})
-        else:
+        elif resp_type == "TEXT":
             res_box = st.empty()
             full_txt = ""
             for chunk in result:
@@ -51,11 +62,7 @@ if prompt := st.chat_input("在 Genesis OS 中检索或创作..."):
                     res_box.markdown(full_txt + "▌")
             res_box.markdown(full_txt)
             st.session_state.messages.append({"role": "assistant", "content": full_txt})
-            st.rerun()
+    st.rerun()
 
 # 7. 悲伤懒羊羊 Trademark
-st.markdown("""
-    <div class="sheep-footer">
-        © 2026 DIGITAL MEDIA DMT LAB |<span>™</span> 悲伤懒羊羊
-    </div>
-    """, unsafe_allow_html=True)
+st.markdown("""<div class="sheep-footer">© 2026 DIGITAL MEDIA DMT LAB |<span>™</span> 悲伤懒羊羊</div>""", unsafe_allow_html=True)
